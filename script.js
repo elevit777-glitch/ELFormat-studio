@@ -55,13 +55,13 @@ if(briefButton){
  const prev=document.getElementById("slide-prev"),next=document.getElementById("slide-next"),counter=document.getElementById("slide-count");
  let slideIndex=-1;const slideFiles=Array.from({length:7},(_,i)=>`pharma_slide_${String(i+1).padStart(2,"0")}.webp`);
  function renderSlide(){if(slideIndex<0)return;const src=slideFiles[slideIndex];img.src=src;original.href=src;
-     const downloadable=fileByPreview[src];if(downloadable){fileLink.href=downloadable[0];fileLink.textContent=downloadable[1];fileLink.hidden=false;}else{fileLink.hidden=true;fileLink.removeAttribute('href');}title.textContent=`B2B Pharma · слайд ${slideIndex+1} из 7`;if(counter)counter.textContent=`${slideIndex+1} / 7 · `;}
+     const downloadable=fileByPreview[src];if(downloadable){fileLink.href=downloadable[0];fileLink.download=downloadable[0];fileLink.dataset.downloadFile=downloadable[0];fileLink.textContent=downloadable[1];fileLink.hidden=false;}else{fileLink.hidden=true;fileLink.removeAttribute('href');delete fileLink.dataset.downloadFile;}title.textContent=`B2B Pharma · слайд ${slideIndex+1} из 7`;if(counter)counter.textContent=`${slideIndex+1} / 7 · `;}
  function moveSlide(delta){slideIndex=(slideIndex+delta+slideFiles.length)%slideFiles.length;renderSlide();}
  const fileByPreview={'excel_preview.png':['ELFormat_demo_sales_report.xlsx','⬇ Скачать Excel · XLSX'],'word_preview.jpg':['ELFormat_demo_business_proposal.docx','⬇ Скачать Word · DOCX']};
  const dismiss=()=>{
    if(box.hidden)return;
    box.hidden=true;
-   img.removeAttribute('src');fileLink.hidden=true;fileLink.removeAttribute('href');
+   img.removeAttribute('src');fileLink.hidden=true;fileLink.removeAttribute('href');delete fileLink.dataset.downloadFile;
    slideIndex=-1;if(counter)counter.textContent="";if(prev)prev.hidden=true;if(next)next.hidden=true;
    document.body.style.overflow='';
    if(previous&&previous.isConnected)previous.focus();
@@ -71,7 +71,7 @@ if(briefButton){
      event.preventDefault();previous=link;
      const src=link.getAttribute('data-lightbox');
      img.src=src;original.href=src;
-     const downloadable=fileByPreview[src];if(downloadable){fileLink.href=downloadable[0];fileLink.textContent=downloadable[1];fileLink.hidden=false;}else{fileLink.hidden=true;fileLink.removeAttribute('href');}
+     const downloadable=fileByPreview[src];if(downloadable){fileLink.href=downloadable[0];fileLink.download=downloadable[0];fileLink.dataset.downloadFile=downloadable[0];fileLink.textContent=downloadable[1];fileLink.hidden=false;}else{fileLink.hidden=true;fileLink.removeAttribute('href');delete fileLink.dataset.downloadFile;}
      title.textContent=link.getAttribute('data-lightbox-title')||'Просмотр работы';
      slideIndex=slideFiles.indexOf(src);if(prev)prev.hidden=slideIndex<0;if(next)next.hidden=slideIndex<0;if(slideIndex>=0)renderSlide();else if(counter)counter.textContent="";
      box.hidden=false;document.body.style.overflow='hidden';close.focus();
@@ -95,32 +95,31 @@ if(briefButton){
  });
 })();
 
-// Reliable offline download: Office ZIP containers should never be navigated as pages.
-// Using a Blob URL avoids Safari attempting to render DOCX/XLSX as raw text on file://.
+// On public HTTPS hosting, use ordinary same-origin download links.
+// The legacy Blob workaround is needed only for offline file:// viewing.
 (() => {
+ if(window.location.protocol !== 'file:') return;
  const toast = document.getElementById('download-toast');
- const notice = msg => { if(toast){toast.hidden=false;toast.textContent=msg;} };
- const b64bytes = value => {
-   const bin=atob(value), bytes=new Uint8Array(bin.length);
-   for(let i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+ const notice = msg => {if(toast){toast.hidden=false;toast.textContent=msg;}};
+ const toBytes = b64 => {
+   const raw = atob(b64), bytes = new Uint8Array(raw.length);
+   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
    return bytes;
  };
  document.addEventListener('click', event => {
    const link=event.target.closest('a[data-download-file]');
    if(!link)return;
-   const fname=link.getAttribute('data-download-file');
-   const asset=window.ELFORMAT_DOWNLOADS?.[fname];
-   if(!asset){ event.preventDefault();notice('Файл не найден в демонстрационном комплекте. Откройте его из папки сайта через Finder.');return; }
-   event.preventDefault(); event.stopPropagation();
-   let url;
+   const filename=link.getAttribute('data-download-file');
+   const asset=window.ELFORMAT_DOWNLOADS?.[filename];
+   if(!asset)return; // keep the standard anchor as a fallback
+   event.preventDefault();event.stopPropagation();
    try{
-     const binary=new Blob([b64bytes(asset.base64)],{type:'application/octet-stream'});
-     url=URL.createObjectURL(binary);
-     const a=document.createElement('a'); a.href=url;a.download=fname;
-     a.style.display='none'; document.body.appendChild(a);a.click();a.remove();
-     notice('Запрошено скачивание '+fname+'. Проверьте папку «Загрузки». Если Safari не сохранил файл, откройте его прямо из распакованной папки ELFormat.');
-     // Avoid revoking URL before Safari's download machinery consumes it.
+     const blob=new Blob([toBytes(asset.base64)],{type:asset.mime||'application/octet-stream'});
+     const url=URL.createObjectURL(blob);
+     const a=document.createElement('a');a.href=url;a.download=filename;
+     document.body.appendChild(a);a.click();a.remove();
      setTimeout(()=>URL.revokeObjectURL(url),60000);
-   }catch(err){ if(url)URL.revokeObjectURL(url); notice('Safari не разрешил скачивание. Откройте '+fname+' в распакованной папке сайта через Finder.'); }
+     notice('Скачивание запрошено: '+filename+'. Проверьте «Загрузки».');
+   }catch(error){notice('Не удалось скачать файл в локальном режиме. Откройте его из папки сайта.');}
  },true);
 })();
