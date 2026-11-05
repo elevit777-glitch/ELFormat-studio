@@ -95,31 +95,5 @@ if(briefButton){
  });
 })();
 
-// On public HTTPS hosting, use ordinary same-origin download links.
-// The legacy Blob workaround is needed only for offline file:// viewing.
-(() => {
- if(window.location.protocol !== 'file:') return;
- const toast = document.getElementById('download-toast');
- const notice = msg => {if(toast){toast.hidden=false;toast.textContent=msg;}};
- const toBytes = b64 => {
-   const raw = atob(b64), bytes = new Uint8Array(raw.length);
-   for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
-   return bytes;
- };
- document.addEventListener('click', event => {
-   const link=event.target.closest('a[data-download-file]');
-   if(!link)return;
-   const filename=link.getAttribute('data-download-file');
-   const asset=window.ELFORMAT_DOWNLOADS?.[filename];
-   if(!asset)return; // keep the standard anchor as a fallback
-   event.preventDefault();event.stopPropagation();
-   try{
-     const blob=new Blob([toBytes(asset.base64)],{type:asset.mime||'application/octet-stream'});
-     const url=URL.createObjectURL(blob);
-     const a=document.createElement('a');a.href=url;a.download=filename;
-     document.body.appendChild(a);a.click();a.remove();
-     setTimeout(()=>URL.revokeObjectURL(url),60000);
-     notice('Скачивание запрошено: '+filename+'. Проверьте «Загрузки».');
-   }catch(error){notice('Не удалось скачать файл в локальном режиме. Откройте его из папки сайта.');}
- },true);
-})();
+// ELFormat is served via HTTPS. Download links use native browser behavior.
+// The Office source files are also available directly from GitHub as a fallback.
